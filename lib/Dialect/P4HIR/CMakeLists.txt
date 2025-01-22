@@ -1,5 +1,7 @@
 add_mlir_dialect_library(P4MLIR_P4HIR
-  P4HIR.cpp
+  P4HIR_Ops.cpp
+  P4HIR_Types.cpp
+  P4HIR_Attrs.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/include/p4mlir/Dialect/P4HIR

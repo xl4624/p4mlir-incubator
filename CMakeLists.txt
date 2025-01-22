@@ -9,7 +9,7 @@ include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${P4MLIR_SOURCE_DIR}/include)
 include_directories(${P4MLIR_BINARY_DIR}/include)
-
+set(LLVM_RUNTIME_OUTPUT_INTDIR "${P4MLIR_BINARY_DIR}/bin")
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)

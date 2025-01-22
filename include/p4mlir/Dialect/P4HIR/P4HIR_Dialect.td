@@ -16,7 +16,16 @@ def P4HIR_Dialect : Dialect {
     }];
     let cppNamespace = "::P4::P4MLIR::P4HIR";
 
-    let useDefaultTypePrinterParser = 1;
+    let useDefaultTypePrinterParser = 0;
+    let useDefaultAttributePrinterParser = 1;
+
+    let extraClassDeclaration = [{
+        mlir::Type parseType(mlir::DialectAsmParser &parser) const override;
+        void printType(mlir::Type type, mlir::DialectAsmPrinter &printer) const override;
+
+        void registerAttributes();
+        void registerTypes();
+    }];
 }
 
 #endif // P4MLIR_DIALECT_P4HIR_P4HIR_DIALECT_TD

@@ -1,0 +1,62 @@
+#ifndef P4MLIR_DIALECT_P4HIR_P4HIR_ATTRS_TD
+#define P4MLIR_DIALECT_P4HIR_P4HIR_ATTRS_TD
+
+include "mlir/IR/BuiltinAttributeInterfaces.td"
+include "mlir/IR/EnumAttr.td"
+
+include "p4mlir/Dialect/P4HIR/P4HIR_Dialect.td"
+
+class P4HIR_Attr<string name, string attrMnemonic, list<Trait> traits = []>
+    : AttrDef<P4HIR_Dialect, name, traits> {
+  let mnemonic = attrMnemonic;
+}
+
+//===----------------------------------------------------------------------===//
+// BoolAttr
+//===----------------------------------------------------------------------===//
+
+def P4_BoolAttr : P4HIR_Attr<"Bool", "bool", [TypedAttrInterface]> {
+  let summary = "Represent true/false for !p4hir.bool types";
+  let description = [{
+    The BoolAttr represents a 'true' or 'false' value.
+  }];
+
+  let parameters = (ins AttributeSelfTypeParameter<"", "BoolType">:$type,
+                    "bool":$value);
+
+  let assemblyFormat = [{
+    `<` $value `>`
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// IntegerAttr
+//===----------------------------------------------------------------------===//
+
+def IntAttr : P4HIR_Attr<"Int", "int", [TypedAttrInterface]> {
+  let summary = "An Attribute containing a integer value";
+  let description = [{
+    An integer attribute is a literal attribute that represents an integral
+    value of the specified integer type.
+  }];
+  let parameters = (ins AttributeSelfTypeParameter<"">:$type, "llvm::APInt":$value);
+  let builders = [
+    AttrBuilderWithInferredContext<(ins "mlir::Type":$type, "const llvm::APInt &":$value), [{
+      return $_get(type.getContext(), type, value);
+    }]>,
+    AttrBuilderWithInferredContext<(ins "mlir::Type":$type, "int64_t":$value), [{
+      BitsType intType = mlir::cast<BitsType>(type);
+      mlir::APInt apValue(intType.getWidth(), value, intType.isSigned());
+      return $_get(intType.getContext(), intType, apValue);
+    }]>,
+  ];
+  let extraClassDeclaration = [{
+    int64_t getSInt() const { return getValue().getSExtValue(); }
+    uint64_t getUInt() const { return getValue().getZExtValue(); }
+    bool isNullValue() const { return getValue() == 0; }
+  }];
+  let genVerifyDecl = 1;
+  let hasCustomAssemblyFormat = 1;
+}
+
+#endif // P4MLIR_DIALECT_P4HIR_P4HIR_ATTRS_TD

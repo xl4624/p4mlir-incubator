@@ -20,3 +20,5 @@ set(FETCHCONTENT_QUIET ${FETCHCONTENT_QUIET_PREV})
 
 set(MLIR_INCLUDE_DIRS "${llvm_SOURCE_DIR}/../mlir/include;${llvm_BINARY_DIR}/tools/mlir/include" PARENT_SCOPE)
 set(LLVM_INCLUDE_DIRS "${llvm_SOURCE_DIR}/include;${llvm_BINARY_DIR}/include" PARENT_SCOPE)
+set(LLVM_EXTERNAL_LIT "${llvm_BINARY_DIR}/bin/llvm-lit" PARENT_SCOPE)
+set(LLVM_TOOLS_BINARY_DIR "${llvm_BINARY_DIR}/bin" PARENT_SCOPE)
