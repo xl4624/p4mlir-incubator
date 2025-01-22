@@ -21,7 +21,9 @@ class P4HIR_TypeNoMnemonic<string name, string typeMnemonic, list<Trait> traits 
 
 //===----------------------------------------------------------------------===//
 // Integer types: signed (int) and unsigned (bit)
-def P4HIR_BitsType : P4HIR_TypeNoMnemonic<"Bits", "bits"> {
+//===----------------------------------------------------------------------===//
+
+def BitsType : P4HIR_TypeNoMnemonic<"Bits", "bits"> {
   let summary = "fixed width integer type";
   let description = [{
     The `p4hir.bit` / `p4hir.int` type represents a P4 `bit` or `int` type.
@@ -42,7 +44,7 @@ def P4HIR_BitsType : P4HIR_TypeNoMnemonic<"Bits", "bits"> {
 }
 
 // Unsigned integer type of a specific width (bits<width>).
-class P4HIR_Bit<int width>
+class Bit<int width>
   : Type<And<[
         CPred<"::mlir::isa<::p4hir::BitsType>($_self)">,
         CPred<"::mlir::cast<::p4hir::BitsType>($_self).isUnsigned()">,
@@ -55,7 +57,7 @@ class P4HIR_Bit<int width>
 }
 
 // Signed integer type of a specific width (int<width>).
-class P4HIR_Int<int width>
+class Int<int width>
   : Type<And<[
         CPred<"::mlir::isa<::p4hir::IntType>($_self)">,
         CPred<"::mlir::cast<::p4hir::IntType>($_self).isSigned()">,
@@ -68,14 +70,11 @@ class P4HIR_Int<int width>
 }
 
 //===----------------------------------------------------------------------===//
-// BoolType
-//
-// An alternative here is to represent bool as mlir::i1, but let's be more
-// generic.
-//
+// BooleanType: An alternative here is to represent bool as mlir::i1, but
+// let's be more generic, it could be lowered later on
 //===----------------------------------------------------------------------===//
 
-def P4HIR_BooleanType : P4HIR_Type<"Bool", "bool"> {
+def BooleanType : P4HIR_Type<"Bool", "bool"> {
   let summary = "boolean type";
   let description = [{
     `p4hir.bool` represents a P4 `bool` type.
@@ -85,9 +84,19 @@ def P4HIR_BooleanType : P4HIR_Type<"Bool", "bool"> {
 }
 
 //===----------------------------------------------------------------------===//
+// "Singleton" types
+//===----------------------------------------------------------------------===//
+
+def DontcareType : P4HIR_Type<"Dontcare", "dontcare"> {}
+// FIXME: Add string for error here & declarations
+def ErrorType : P4HIR_Type<"Error", "error"> {}
+def UnknownType : P4HIR_Type<"Unknown", "unknown"> {}
+
+//===----------------------------------------------------------------------===//
 // P4HIR type constraints.
 //===----------------------------------------------------------------------===//
 
-def AnyP4Type : AnyTypeOf<[P4HIR_BitsType, P4HIR_BooleanType]> {}
+def AnyP4Type : AnyTypeOf<[BitsType, BooleanType,
+                           DontcareType, ErrorType, UnknownType]> {}
 
 #endif // P4MLIR_DIALECT_P4HIR_P4HIR_TYPES_TD

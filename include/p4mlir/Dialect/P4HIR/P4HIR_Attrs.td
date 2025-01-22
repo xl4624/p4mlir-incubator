@@ -15,7 +15,7 @@ class P4HIR_Attr<string name, string attrMnemonic, list<Trait> traits = []>
 // BoolAttr
 //===----------------------------------------------------------------------===//
 
-def P4_BoolAttr : P4HIR_Attr<"Bool", "bool", [TypedAttrInterface]> {
+def P4HIR_BoolAttr : P4HIR_Attr<"Bool", "bool", [TypedAttrInterface]> {
   let summary = "Represent true/false for !p4hir.bool types";
   let description = [{
     The BoolAttr represents a 'true' or 'false' value.
@@ -30,10 +30,10 @@ def P4_BoolAttr : P4HIR_Attr<"Bool", "bool", [TypedAttrInterface]> {
 }
 
 //===----------------------------------------------------------------------===//
-// IntegerAttr
+// IntAttr
 //===----------------------------------------------------------------------===//
 
-def IntAttr : P4HIR_Attr<"Int", "int", [TypedAttrInterface]> {
+def P4HIR_IntAttr : P4HIR_Attr<"Int", "int", [TypedAttrInterface]> {
   let summary = "An Attribute containing a integer value";
   let description = [{
     An integer attribute is a literal attribute that represents an integral

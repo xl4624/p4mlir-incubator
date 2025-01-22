@@ -21,7 +21,7 @@ class P4HIR_Op<string mnemonic, list<Trait> traits = []> :
 // P4HIR operation definitions.
 //===----------------------------------------------------------------------===//
 
-def P4HIR_ConstOp : P4HIR_Op<"const",
+def ConstOp : P4HIR_Op<"const",
     [ConstantLike, Pure, AllTypesMatch<["value", "res"]>]> {
     let summary = "Defines a P4 constant";
     let description = [{
