@@ -2,6 +2,7 @@
 #define P4MLIR_DIALECT_P4HIR_P4HIR_TYPES_TD
 
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/EnumAttr.td"
 
 include "p4mlir/Dialect/P4HIR/P4HIR_Dialect.td"
 
@@ -127,6 +128,44 @@ def ReferenceType : P4HIR_Type<"Reference", "ref"> {
   }];
 
   let skipDefaultBuilders = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// ParameterType
+//===----------------------------------------------------------------------===//
+
+def P4HIR_ActionType : P4HIR_Type<"Action", "action"> {
+  let summary = "P4 action type";
+  let description = [{
+    The `!p4hir.action` is an action type. It is essentially a list of parameter
+    types. There is no return type for actions.
+
+    Example:
+
+    ```mlir
+    !p4hir.action<()>
+    !p4hir.action<(!p4hir.bit<32>, !p4hir.int<42>)>
+    ```
+  }];
+
+  let parameters = (ins ArrayRefParameter<"mlir::Type">:$inputs);
+
+  // Use a custom parser to handle the argument types in better way.
+  let assemblyFormat = [{
+    `<` custom<ActionType>($inputs) `>`
+  }];
+
+  let extraClassDeclaration = [{
+    /// Returns the `i`th input operand type. Asserts if out of bounds.
+    mlir::Type getInput(unsigned i) const { return getInputs()[i]; }
+
+    /// Returns the number of arguments to the function.
+    unsigned getNumInputs() const { return getInputs().size(); }
+
+    /// Returns a clone of this action type with the given argument
+    /// and result types. Required for FunctionOp interface
+    ActionType clone(mlir::TypeRange inputs, mlir::TypeRange outputs) const;
+  }];
 }
 
 //===----------------------------------------------------------------------===//

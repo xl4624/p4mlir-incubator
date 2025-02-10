@@ -4,6 +4,11 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "p4mlir/Dialect/P4HIR/P4HIR_Dialect.h"
+#include "p4mlir/Dialect/P4HIR/P4HIR_OpsEnums.h"
+
+static mlir::ParseResult parseActionType(mlir::AsmParser &p, llvm::SmallVector<mlir::Type> &params);
+
+static void printActionType(mlir::AsmPrinter &p, mlir::ArrayRef<mlir::Type> params);
 
 #define GET_TYPEDEF_CLASSES
 #include "p4mlir/Dialect/P4HIR/P4HIR_Types.cpp.inc"
@@ -60,6 +65,29 @@ void P4HIRDialect::printType(mlir::Type type, mlir::DialectAsmPrinter &os) const
     TypeSwitch<Type>(type).Case<BitsType>([&](BitsType type) { type.print(os); }).Default([](Type) {
         llvm::report_fatal_error("printer is missing a handler for this type");
     });
+}
+
+ActionType ActionType::clone(TypeRange inputs, TypeRange results) const {
+    assert(results.size() == 0 && "expected exactly zero result type");
+    return get(getContext(), llvm::to_vector(inputs));
+}
+
+static mlir::ParseResult parseActionType(mlir::AsmParser &p,
+                                         llvm::SmallVector<mlir::Type> &params) {
+    return p.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, [&]() -> ParseResult {
+        mlir::Type type;
+        if (p.parseType(type)) return mlir::failure();
+        params.push_back(type);
+        return mlir::success();
+    });
+
+    return p.parseRParen();
+}
+
+static void printActionType(mlir::AsmPrinter &p, mlir::ArrayRef<mlir::Type> params) {
+    p << '(';
+    llvm::interleaveComma(params, p, [&p](mlir::Type type) { p.printType(type); });
+    p << ')';
 }
 
 void P4HIRDialect::registerTypes() {
