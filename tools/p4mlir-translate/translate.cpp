@@ -163,7 +163,7 @@ class P4HIRConverter : public P4::Inspector, public P4::ResolutionContext {
 
     mlir::Value getBoolConstant(mlir::Location loc, bool value) {
         auto boolType = P4HIR::BoolType::get(context());
-        return builder.create<P4HIR::ConstOp>(loc, boolType,
+        return builder.create<P4HIR::ConstOp>(loc,
                                               P4HIR::BoolAttr::get(context(), boolType, value));
     }
 
@@ -187,7 +187,7 @@ class P4HIRConverter : public P4::Inspector, public P4::ResolutionContext {
     }
 
     mlir::Type getOrCreateType(const P4::IR::Expression *expr) {
-        return getOrCreateType(expr->type);
+        return getOrCreateType(typeMap->getType(expr, true));
     }
 
     mlir::Type getOrCreateType(const P4::IR::Declaration_Variable *decl) {
@@ -247,7 +247,7 @@ class P4HIRConverter : public P4::Inspector, public P4::ResolutionContext {
 
         if (mlir::isa<P4HIR::ReferenceType>(val.getType()))
             // Getting value out of variable involves a load.
-            return builder.create<P4HIR::LoadOp>(getLoc(builder, node), val);
+            return builder.create<P4HIR::ReadOp>(getLoc(builder, node), val);
 
         return val;
     }
@@ -534,26 +534,20 @@ mlir::TypedAttr P4HIRConverter::resolveConstantExpr(const P4::IR::Expression *ex
 mlir::Value P4HIRConverter::materializeConstantExpr(const P4::IR::Expression *expr) {
     ConversionTracer trace("Materializing constant expression ", expr);
 
-    auto type = getOrCreateType(expr->type);
     auto init = getOrCreateConstantExpr(expr);
     auto loc = getLoc(builder, expr);
 
-    // Hack: type inference sometimes keeps `Type_Unknown` for some constants, in such case
-    // use type from the initializer
-    if (mlir::isa<P4HIR::UnknownType>(type)) type = init.getType();
-
-    auto val = builder.create<P4HIR::ConstOp>(loc, type, init);
+    auto val = builder.create<P4HIR::ConstOp>(loc, init);
     return setValue(expr, val);
 }
 
 bool P4HIRConverter::preorder(const P4::IR::Declaration_Constant *decl) {
     ConversionTracer trace("Converting ", decl);
 
-    auto type = getOrCreateType(decl->type);
     auto init = getOrCreateConstantExpr(decl->initializer);
     auto loc = getLoc(builder, decl);
 
-    auto val = builder.create<P4HIR::ConstOp>(loc, type, init);
+    auto val = builder.create<P4HIR::ConstOp>(loc, init, decl->name.string_view());
     setValue(decl, val);
 
     return false;
@@ -562,24 +556,18 @@ bool P4HIRConverter::preorder(const P4::IR::Declaration_Constant *decl) {
 void P4HIRConverter::postorder(const P4::IR::Declaration_Variable *decl) {
     ConversionTracer trace("Converting ", decl);
 
-    const auto *init = decl->initializer;
-    mlir::Type objectType;
-    if (init) objectType = getOrCreateType(init);
-    if (!objectType || mlir::isa<P4HIR::UnknownType>(objectType))
-        objectType = getOrCreateType(decl->type);
-
     auto type = getOrCreateType(decl);
 
     // TODO: Choose better insertion point for alloca (entry BB or so)
-    auto alloca = builder.create<P4HIR::AllocaOp>(getLoc(builder, decl), type, objectType,
-                                                  decl->name.string_view());
+    auto var = builder.create<P4HIR::VariableOp>(
+        getLoc(builder, decl), type, mlir::StringAttr::get(context(), decl->name.string_view()));
 
-    if (init) {
-        alloca.setInit(true);
-        builder.create<P4HIR::StoreOp>(getLoc(builder, init), getValue(decl->initializer), alloca);
+    if (const auto *init = decl->initializer) {
+        var.setInit(true);
+        builder.create<P4HIR::AssignOp>(getLoc(builder, init), getValue(decl->initializer), var);
     }
 
-    setValue(decl, alloca);
+    setValue(decl, var);
 }
 
 void P4HIRConverter::postorder(const P4::IR::Cast *cast) {
@@ -660,7 +648,7 @@ bool P4HIRConverter::preorder(const P4::IR::AssignmentStatement *assign) {
     visit(assign->left);
     visit(assign->right);
     auto ref = resolveReference(assign->left);
-    builder.create<P4HIR::StoreOp>(getLoc(builder, assign), getValue(assign->right), ref);
+    builder.create<P4HIR::AssignOp>(getLoc(builder, assign), getValue(assign->right), ref);
     return false;
 }
 
@@ -924,17 +912,17 @@ bool P4HIRConverter::preorder(const P4::IR::MethodCallExpression *mce) {
                 case P4::IR::Direction::Out:
                 case P4::IR::Direction::InOut: {
                     // Just create temporary to hold the output value, initialize in case of inout
-                    auto ref = resolveReference(arg->expression);
-                    auto type = mlir::cast<P4HIR::ReferenceType>(ref.getType());
-
-                    auto copyIn = b.create<P4HIR::AllocaOp>(
-                        loc, type, type.getObjectType(),
-                        llvm::Twine(params[idx]->name.string_view()) +
-                            (dir == P4::IR::Direction::InOut ? "_inout" : "_out"));
+                    auto ref = P4HIR::ReferenceType::get(getOrCreateType(arg->expression));
+                    auto copyIn = b.create<P4HIR::VariableOp>(
+                        loc, ref,
+                        mlir::StringAttr::get(
+                            context(),
+                            llvm::Twine(params[idx]->name.string_view()) +
+                                (dir == P4::IR::Direction::InOut ? "_inout_arg" : "_out_arg")));
 
                     if (dir == P4::IR::Direction::InOut) {
                         copyIn.setInit(true);
-                        b.create<P4HIR::StoreOp>(loc, getValue(arg->expression), copyIn);
+                        b.create<P4HIR::AssignOp>(loc, getValue(arg->expression), copyIn);
                     }
                     argVal = copyIn;
                     break;
@@ -973,9 +961,9 @@ bool P4HIRConverter::preorder(const P4::IR::MethodCallExpression *mce) {
 
             mlir::Value copyOut = operands[idx];
             mlir::Value dest = resolveReference(arg->expression);
-            b.create<P4HIR::StoreOp>(
+            b.create<P4HIR::AssignOp>(
                 getEndLoc(builder, mce),
-                builder.create<P4HIR::LoadOp>(getEndLoc(builder, mce), copyOut), dest);
+                builder.create<P4HIR::ReadOp>(getEndLoc(builder, mce), copyOut), dest);
         }
 
         // If we are inside the scope, then build the yield of the call result
