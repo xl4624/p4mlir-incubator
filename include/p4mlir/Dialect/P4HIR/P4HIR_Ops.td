@@ -96,7 +96,7 @@ def AllocaOp : P4HIR_Op<"alloca", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "mlir::Type":$ref, "mlir::Type":$objectType, "llvm::StringRef":$name)>,
+    OpBuilder<(ins "mlir::Type":$ref, "mlir::Type":$objectType, "const llvm::Twine &":$name)>,
   ];
 
   let assemblyFormat = [{
@@ -175,6 +175,7 @@ def StoreOp : P4HIR_Op<"store", [
 
 // TODO: Decide if we'd want to be more precise and split cast into
 // bitcast, trunc and extensions
+// TODO: Add CastOpInterface
 def CastOp : P4HIR_Op<"cast",
              [Pure/*,
               DeclareOpInterfaceMethods<PromotableOpInterface>*/]> {
@@ -385,7 +386,6 @@ def YieldOp : P4HIR_Op<"yield", [ReturnLike, Terminator,
     ParentOneOf<["ScopeOp", "TernaryOp", "IfOp",
                  // "SwitchOp", "CaseOp",
                  // "ForInOp", "ForOp",
-                 // "CallOp"
                  ]>]> {
   let summary = "Represents the default branching behaviour of a region";
   let description = [{
@@ -534,11 +534,16 @@ def IfOp : P4HIR_Op<"if",
 }
 
 def ReturnOp : P4HIR_Op<"return", [ParentOneOf<["ScopeOp", "IfOp",
-                                                "ActionOp",
+                                                "FuncOp",
                                              // "SwitchOp", "CaseOp",
                                              // "ForInOp", "ForOp",
                                              ]>,
-                                 Terminator]> {
+  // Note that ReturnOp is not ReturnLike: currently there is no way to
+  // represent early exits in MLIR "properly"
+  // We might not be able to have it a Terminator at this level in order
+  // to represent dead code. We might lower it to proper terminator later (!)
+  // See https://discourse.llvm.org/t/rfc-region-based-control-flow-with-early-exits-in-mlir/76998
+                                   Terminator]> {
   let summary = "Return from function or action";
   let description = [{
     The "return" operation represents a return operation within a function or action.
@@ -579,13 +584,12 @@ def ReturnOp : P4HIR_Op<"return", [ParentOneOf<["ScopeOp", "IfOp",
   let hasVerifier = 1;
 }
 
-def ActionOp : P4HIR_Op<"action", [
+def FuncOp : P4HIR_Op<"func", [
   AutomaticAllocationScope, CallableOpInterface, FunctionOpInterface,
   IsolatedFromAbove
 ]> {
-  let summary = "Define an action";
+  let summary = "Define a function-like object (action, function)";
   let description = [{
-
     Similar to `mlir::FuncOp` built-in:
     > Operations within the function cannot implicitly capture values defined
     > outside of the function, i.e. Functions are `IsolatedFromAbove`. All
@@ -600,9 +604,12 @@ def ActionOp : P4HIR_Op<"action", [
     > Only dialect attribute names may be specified in the attribute dictionaries
     > for function arguments, results, or the function itself.
 
-    Action parameters might have direction that is specified via `p4hir.dir`
+    Parameters might have direction that is specified via `p4hir.dir`
     attribute. Out and inout parameters must have a reference type. All
     refence-typed parameters must have a direction and it should be `out` or `input`.
+
+    An action must be marked as `action`, should always have a body and cannot return
+    anything.
 
     Example:
 
@@ -624,20 +631,55 @@ def ActionOp : P4HIR_Op<"action", [
   }];
 
   let arguments = (ins SymbolNameAttr:$sym_name,
-                       TypeAttrOf<P4HIR_ActionType>:$function_type,
+                       TypeAttrOf<FuncType>:$function_type,
+                       UnitAttr:$action,
                        OptionalAttr<DictArrayAttr>:$arg_attrs,
+                       OptionalAttr<DictArrayAttr>:$res_attrs,
                        OptionalAttr<ArrayAttr>:$annotations);
   let regions = (region AnyRegion:$body);
   let skipDefaultBuilders = 1;
 
-  let builders = [OpBuilder<(ins "llvm::StringRef":$name, "ActionType":$type,
-                                  CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs,
-                                  CArg<"llvm::ArrayRef<mlir::DictionaryAttr>", "{}">:$argAttrs)>];
+  let builders = [
+    OpBuilder<(ins "llvm::StringRef":$name, "FuncType":$type,
+               CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs,
+               CArg<"llvm::ArrayRef<mlir::DictionaryAttr>", "{}">:$argAttrs)>
+  ];
 
   let extraClassDeclaration = [{
+    // TODO: move to custom builder
+    static FuncOp buildAction(mlir::OpBuilder &builder,
+                              mlir::Location loc,
+                              llvm::StringRef name,
+                              P4HIR::FuncType type,
+                              llvm::ArrayRef<mlir::NamedAttribute> attrs = {},
+                              llvm::ArrayRef<mlir::DictionaryAttr> argAttrs = {}) {
+      auto op = builder.create<FuncOp>(loc, name, type, attrs, argAttrs);
+      op.createEntryBlock();
+      op.setAction(true);
+      return op;
+    }
+
     /// Returns the region on the current operation that is callable. Always
     /// non-null for actions.
-    mlir::Region *getCallableRegion();
+    mlir::Region *getCallableRegion() { return isExternal() ? nullptr : &getBody(); }
+
+    /// Returns the results types that the callable region produces when
+    /// executed.
+    llvm::ArrayRef<mlir::Type> getCallableResults() {
+      return getFunctionType().getReturnTypes();
+    }
+
+    /// Returns the argument attributes for all callable region arguments or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableArgAttrs() {
+      return getArgAttrs().value_or(nullptr);
+    }
+
+    /// Returns the result attributes for all callable region results or null if
+    /// there are none.
+    ::mlir::ArrayAttr getCallableResAttrs() {
+      return getResAttrs().value_or(nullptr);
+    }
 
     /// Returns the argument types of this action.
     llvm::ArrayRef<mlir::Type> getArgumentTypes() {
@@ -665,10 +707,10 @@ def ActionOp : P4HIR_Op<"action", [
       return ParamDirection::None;
     }
 
-    /// Returns the result types of this action. Required for FunctionOp
-    /// interface, so return empty.
+    /// Returns 0 or 1 result type of this function (0 in the case of a function
+    /// returing void or action)
     llvm::ArrayRef<mlir::Type> getResultTypes() {
-       return {};
+       return getFunctionType().getReturnTypes();
     }
 
     /// Hook for OpTrait::FunctionOpInterfaceTrait, called after verifying that
@@ -676,10 +718,93 @@ def ActionOp : P4HIR_Op<"action", [
     /// Ensures getType, getNumFuncArguments, and getNumFuncResults can be
     /// called safely.
     llvm::LogicalResult verifyType();
+
+    bool isDeclaration() { return isExternal(); }
+
+    void createEntryBlock();
   }];
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+}
+
+def CallOp : P4HIR_Op<"call",
+  [NoRegionArguments, CallOpInterface,
+   DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+  let summary = "call operation";
+  let description = [{
+    The `call` operation represents a direct call to a method (action, function, etc.) that
+    is within the same symbol scope as the call. The operands and result types of the call must
+    match the specified function type. The callee is encoded as a symbol reference attribute
+    named "callee".
+
+    Example:
+
+    ```mlir
+    // Direct call of function
+    %2 = p4hir.call @my_add(%0, %1) : (!p4hir.bit<8>, !p4hir.bit<8>) -> !p4hir.bit<8>
+    // Direct call of action
+    %4 = p4hir.call @my_add(%0, %1) : (!p4hir.bit<8>, !p4hir.bit<8>) -> ()
+    ...
+    ```
+  }];
+
+  // TODO: Refine result types, refine parameter type
+  let results = (outs Optional<CallResultP4Type>:$result);
+  let arguments = (ins OptionalAttr<FlatSymbolRefAttr>:$callee, Variadic<AnyType>:$operands);
+
+  let skipDefaultBuilders = 1;
+  let hasVerifier = 0;
+
+  let builders = [
+    // Functions
+    OpBuilder<(ins "mlir::SymbolRefAttr":$callee, "mlir::Type":$resType,
+               CArg<"mlir::ValueRange", "{}">:$operands), [{
+      $_state.addOperands(operands);
+      $_state.addAttribute("callee", callee);
+      if (resType && !isa<VoidType>(resType))
+        $_state.addTypes(resType);
+    }]>,
+    // Everything else that does not produce result
+    OpBuilder<(ins "mlir::SymbolRefAttr":$callee,
+               CArg<"mlir::ValueRange", "{}">:$operands), [{
+      $_state.addOperands(operands);
+      $_state.addAttribute("callee", callee);
+    }]>
+
+  ];
+
+  let extraClassDeclaration = [{
+    /// Get the argument operands to the called function.
+    mlir::OperandRange getArgOperands() {
+      return {arg_operand_begin(), arg_operand_end()};
+    }
+
+    mlir::MutableOperandRange getArgOperandsMutable() {
+      return getOperandsMutable();
+    }
+
+    operand_iterator arg_operand_begin() { return operand_begin(); }
+    operand_iterator arg_operand_end() { return operand_end(); }
+
+    /// Return the callee of this operation.
+    ::mlir::CallInterfaceCallable getCallableForCallee() {
+      return (*this)->getAttrOfType<mlir::SymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(mlir::CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<mlir::SymbolRefAttr>());
+    }
+
+    void setArg(unsigned index, mlir::Value value) {
+      setOperand(index, value);
+    }
+  }];
+
+  let assemblyFormat = [{
+    $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
+  }];
 }
 
 #endif // P4MLIR_DIALECT_P4HIR_P4HIR_OPS_TD
