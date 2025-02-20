@@ -218,6 +218,7 @@ def FuncType : P4HIR_Type<"Func", "func"> {
 
 def AnyP4Type : AnyTypeOf<[BitsType, BooleanType, InfIntType,
                            DontcareType, ErrorType, UnknownType]> {}
+def AnyIntP4Type : AnyTypeOf<[BitsType, InfIntType]> {}
 def CallResultP4Type : AnyTypeOf<[BitsType, BooleanType, InfIntType, VoidType]> {}
 def LoadableP4Type : AnyTypeOf<[BitsType, BooleanType, InfIntType]> {}
 
