@@ -81,6 +81,13 @@ static LogicalResult checkConstantTypes(mlir::Operation *op, mlir::Type opType,
         return success();
     }
 
+    if (mlir::isa<mlir::StringAttr>(attrType)) {
+        if (!mlir::isa<P4HIR::StringType>(opType))
+            return op->emitOpError("result type (")
+                   << opType << ") must be '!p4hir.string' for '" << attrType << "'";
+        return success();
+    }
+
     assert(isa<TypedAttr>(attrType) && "expected typed attribute");
     return op->emitOpError("constant with type ")
            << cast<TypedAttr>(attrType).getType() << " not supported";
@@ -1483,6 +1490,11 @@ struct P4HIROpAsmDialectInterface : public OpAsmDialectInterface {
 
         if (auto errorType = mlir::dyn_cast<P4HIR::ErrorType>(type)) {
             os << errorType.getAlias();
+            return AliasResult::OverridableAlias;
+        }
+
+        if (auto stringType = mlir::dyn_cast<P4HIR::StringType>(type)) {
+            os << stringType.getAlias();
             return AliasResult::OverridableAlias;
         }
 

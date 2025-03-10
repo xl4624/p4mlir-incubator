@@ -23,6 +23,11 @@ def P4HIR_BoolAttr : P4HIR_Attr<"Bool", "bool", [TypedAttrInterface]> {
 
   let parameters = (ins AttributeSelfTypeParameter<"", "BoolType">:$type,
                     "bool":$value);
+  let builders = [
+    AttrBuilder<(ins "bool":$value), [{
+      return $_get($_ctxt, BoolType::get($_ctxt), value);
+    }]>,
+  ];
 
   let assemblyFormat = [{
     `<` $value `>`

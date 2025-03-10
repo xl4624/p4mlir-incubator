@@ -6,6 +6,7 @@
 !bit42 = !p4hir.bit<42>
 !ref = !p4hir.ref<!p4hir.bit<42>>
 !void = !p4hir.void
+!string = !p4hir.string
 
 !action_noparams = !p4hir.func<()>
 !action_params = !p4hir.func<(!p4hir.int<42>, !ref, !p4hir.int<42>, !p4hir.bool)>

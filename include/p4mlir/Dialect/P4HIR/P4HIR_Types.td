@@ -125,6 +125,21 @@ def VoidType : P4HIR_Type<"Void", "void"> {
 }
 
 //===----------------------------------------------------------------------===//
+// StringType
+//===----------------------------------------------------------------------===//
+
+def StringType : P4HIR_Type<"String", "string"> {
+  let summary = "string type";
+  let description = [{
+    `p4hir.string` represents a P4 `string` type used for string literals.
+  }];
+
+  let extraClassDeclaration = [{
+    llvm::StringRef getAlias() const { return "string"; };
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // ReferenceType
 //===----------------------------------------------------------------------===//
 
@@ -604,7 +619,7 @@ def ExternType : P4HIR_Type<"Extern", "extern", []> {
 // P4HIR type constraints.
 //===----------------------------------------------------------------------===//
 
-def AnyP4Type : AnyTypeOf<[BitsType, BooleanType, InfIntType,
+def AnyP4Type : AnyTypeOf<[BitsType, BooleanType, InfIntType, StringType,
                            StructType, HeaderType, Builtin_Tuple,
                            EnumType, SerEnumType,
                            ValidBitType,

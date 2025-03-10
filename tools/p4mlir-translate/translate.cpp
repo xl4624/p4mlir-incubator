@@ -123,6 +123,7 @@ class P4TypeConverter : public P4::Inspector, P4::ResolutionContext {
     bool preorder(const P4::IR::Type_Bits *type) override;
     bool preorder(const P4::IR::Type_InfInt *type) override;
     bool preorder(const P4::IR::Type_Boolean *type) override;
+    bool preorder(const P4::IR::Type_String *type) override;
     bool preorder(const P4::IR::Type_Unknown *type) override;
     bool preorder(const P4::IR::Type_Typedef *type) override;
     bool preorder(const P4::IR::Type_Name *name) override;
@@ -173,11 +174,13 @@ class P4HIRConverter : public P4::Inspector, public P4::ResolutionContext {
     mlir::Value resolveReference(const P4::IR::Node *node, bool unchecked = false);
 
     mlir::Value getBoolConstant(mlir::Location loc, bool value) {
-        // TODO: BoolType is excessive here
-        auto boolType = P4HIR::BoolType::get(context());
-        return builder.create<P4HIR::ConstOp>(loc,
-                                              P4HIR::BoolAttr::get(context(), boolType, value));
+        return builder.create<P4HIR::ConstOp>(loc, P4HIR::BoolAttr::get(context(), value));
     }
+    mlir::Value getStringConstant(mlir::Location loc, llvm::Twine &bytes) {
+        return builder.create<P4HIR::ConstOp>(
+            loc, mlir::StringAttr::get(bytes, P4HIR::StringType::get(context())));
+    }
+
     mlir::TypedAttr getTypedConstant(mlir::Type type, mlir::Attribute constant) {
         if (mlir::isa<P4HIR::BoolType>(type)) return mlir::cast<P4HIR::BoolAttr>(constant);
 
@@ -379,6 +382,10 @@ class P4HIRConverter : public P4::Inspector, public P4::ResolutionContext {
         materializeConstantExpr(b);
         return false;
     }
+    bool preorder(const P4::IR::StringLiteral *s) override {
+        materializeConstantExpr(s);
+        return false;
+    }
     bool preorder(const P4::IR::PathExpression *e) override {
         // Should be resolved eslewhere
         return false;
@@ -479,6 +486,14 @@ bool P4TypeConverter::preorder(const P4::IR::Type_Boolean *type) {
 
     ConversionTracer trace("TypeConverting ", type);
     auto mlirType = P4HIR::BoolType::get(converter.context());
+    return setType(type, mlirType);
+}
+
+bool P4TypeConverter::preorder(const P4::IR::Type_String *type) {
+    if ((this->type = converter.findType(type))) return false;
+
+    ConversionTracer trace("TypeConverting ", type);
+    auto mlirType = P4HIR::StringType::get(converter.context());
     return setType(type, mlirType);
 }
 
@@ -786,6 +801,11 @@ mlir::TypedAttr P4HIRConverter::getOrCreateConstantExpr(const P4::IR::Expression
         auto type = P4HIR::BoolType::get(context());
 
         return setConstantExpr(b, P4HIR::BoolAttr::get(context(), type, b->value));
+    }
+    if (const auto *s = expr->to<P4::IR::StringLiteral>()) {
+        auto type = P4HIR::StringType::get(context());
+
+        return setConstantExpr(s, mlir::StringAttr::get(s->value.string_view(), type));
     }
     if (const auto *cast = expr->to<P4::IR::Cast>()) {
         mlir::Type destType = getOrCreateType(cast);
