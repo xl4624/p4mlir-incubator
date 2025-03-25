@@ -362,7 +362,7 @@ LogicalResult HeaderType::verify(function_ref<InFlightDiagnostic()> emitError, S
         [&](ArrayRef<FieldInfo> elements, bool isHeader) -> void {
         for (const auto &elt : elements) {
             auto fieldType = elt.type;
-            if (auto aliasType = mlir::dyn_cast<P4HIR::AliasType>(fieldType))
+            while (auto aliasType = mlir::dyn_cast<P4HIR::AliasType>(fieldType))
                 fieldType = aliasType.getAliasedType();
 
             // varbit and validity bit are allowed at the top (header) level only

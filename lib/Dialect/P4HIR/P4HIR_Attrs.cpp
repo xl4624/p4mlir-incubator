@@ -14,12 +14,10 @@ using namespace P4::P4MLIR::P4HIR;
 
 Attribute IntAttr::parse(AsmParser &parser, Type odsType) {
     mlir::APInt APValue;
-    mlir::Type valType;
+    mlir::Type valType = odsType;
 
-    if (auto aliasType = mlir::dyn_cast<P4HIR::AliasType>(odsType))
+    while (auto aliasType = mlir::dyn_cast<P4HIR::AliasType>(valType))
         valType = aliasType.getAliasedType();
-    else
-        valType = odsType;
 
     if (!mlir::isa<BitsType, InfIntType>(valType)) {
         parser.emitError(parser.getCurrentLocation(), "expected integer type");
@@ -70,7 +68,8 @@ Attribute IntAttr::parse(AsmParser &parser, Type odsType) {
 void IntAttr::print(AsmPrinter &printer) const {
     printer << '<';
     auto type = getType();
-    if (auto aliasType = mlir::dyn_cast<P4HIR::AliasType>(type)) type = aliasType.getAliasedType();
+    while (auto aliasType = mlir::dyn_cast<P4HIR::AliasType>(type))
+        type = aliasType.getAliasedType();
 
     if (auto bitsType = mlir::dyn_cast<BitsType>(type)) {
         APInt val = getValue();
@@ -83,7 +82,7 @@ void IntAttr::print(AsmPrinter &printer) const {
 
 LogicalResult IntAttr::verify(function_ref<InFlightDiagnostic()> emitError, Type type,
                               APInt value) {
-    if (auto aliasType = mlir::dyn_cast<AliasType>(type)) type = aliasType.getAliasedType();
+    while (auto aliasType = mlir::dyn_cast<AliasType>(type)) type = aliasType.getAliasedType();
 
     if (!mlir::isa<BitsType, InfIntType>(type)) {
         emitError() << "expected integer type";
