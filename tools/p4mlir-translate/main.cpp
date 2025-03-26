@@ -174,7 +174,9 @@ int main(int argc, char *const argv[]) {
 
     // MLIR uses thread local storage which is not registered by GC causing
     // double frees
+#if HAVE_LIBGC
     GC_disable();
+#endif
 
     mlir::MLIRContext context;
     context.getOrLoadDialect<P4::P4MLIR::P4HIR::P4HIRDialect>();
