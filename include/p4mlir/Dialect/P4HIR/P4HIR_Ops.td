@@ -1528,8 +1528,7 @@ def SwitchOp : P4HIR_Op<"switch",
 }
 
 def ForOp : P4HIR_Op<"for",
-      [HasParent<"ScopeOp">,
-       AutomaticAllocationScope,
+      [AutomaticAllocationScope,
        DeclareOpInterfaceMethods<LoopLikeOpInterface>,
        DeclareOpInterfaceMethods<RegionBranchOpInterface>,
        RecursiveMemoryEffects, NoRegionArguments,
@@ -1590,8 +1589,7 @@ def ForOp : P4HIR_Op<"for",
 
 def ForInOp : P4HIR_Op<"foreach",
       [AutomaticAllocationScope,
-       // DeclareOpInterfaceMethods<LoopLikeOpInterface>,
-       // DeclareOpInterfaceMethods<RegionBranchOpInterface>,
+       DeclareOpInterfaceMethods<LoopLikeOpInterface>,
        RecursiveMemoryEffects,
        SingleBlockImplicitTerminator<"P4HIR::YieldOp">,
       ]> {
@@ -1615,6 +1613,7 @@ let description = [{
   let assemblyFormat = [{
     `in` $collection `:` type($collection) $bodyRegion attr-dict
   }];
+  // let hasCustomAssemblyFormat = 1;
 }
 
 

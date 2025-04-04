@@ -2422,6 +2422,10 @@ void P4HIR::ForInOp::build(
     bodyBuilder(builder, loopVar, result.location);
 }
 
+llvm::SmallVector<Region *> P4HIR::ForInOp::getLoopRegions() {
+    return {&getBodyRegion()};
+}
+
 //===----------------------------------------------------------------------===//
 // ConditionOp
 //===----------------------------------------------------------------------===//
