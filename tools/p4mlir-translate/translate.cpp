@@ -585,6 +585,34 @@ class P4HIRConverter : public P4::Inspector, public P4::ResolutionContext {
 
 #undef HANDLE_IN_POSTORDER
 
+#define HANDLE_IN_PREORDER(Node, Kind)                                \
+    bool preorder(const P4::IR::Node *opAssign) override {            \
+        return expandOpAssignBinOp(opAssign, P4HIR::BinOpKind::Kind); \
+    }
+
+    HANDLE_IN_PREORDER(MulAssign, Mul)
+    HANDLE_IN_PREORDER(DivAssign, Div)
+    HANDLE_IN_PREORDER(ModAssign, Mod)
+    HANDLE_IN_PREORDER(AddAssign, Add)
+    HANDLE_IN_PREORDER(SubAssign, Sub)
+    HANDLE_IN_PREORDER(AddSatAssign, AddSat)
+    HANDLE_IN_PREORDER(SubSatAssign, SubSat)
+    HANDLE_IN_PREORDER(BAndAssign, And)
+    HANDLE_IN_PREORDER(BOrAssign, Or)
+    HANDLE_IN_PREORDER(BXorAssign, Xor)
+
+#undef HANDLE_IN_PREORDER
+
+#define HANDLE_IN_PREORDER(Node, ShiftOp)                     \
+    bool preorder(const P4::IR::Node *opAssign) override {    \
+        return expandOpAssignShift<P4HIR::ShiftOp>(opAssign); \
+    }
+
+    HANDLE_IN_PREORDER(ShlAssign, ShlOp)
+    HANDLE_IN_PREORDER(ShrAssign, ShrOp)
+
+#undef HANDLE_IN_PREORDER
+
     void postorder(const P4::IR::Member *m) override;
 
     bool preorder(const P4::IR::Declaration_Constant *decl) override;
@@ -629,6 +657,10 @@ class P4HIRConverter : public P4::Inspector, public P4::ResolutionContext {
             return refType.getObjectType();
         return value.getType();
     }
+    bool expandOpAssignBinOp(const P4::IR::OpAssignmentStatement *opAssign, P4HIR::BinOpKind kind);
+
+    template <typename ShiftOp>
+    bool expandOpAssignShift(const P4::IR::OpAssignmentStatement *opAssign);
 };
 
 bool P4TypeConverter::preorder(const P4::IR::Type_Bits *type) {
@@ -1711,6 +1743,34 @@ bool P4HIRConverter::preorder(const P4::IR::AssignmentStatement *assign) {
         visit(assign->right);
         builder.create<P4HIR::AssignOp>(loc, getValue(assign->right, objectType), ref);
     }
+
+    return false;
+}
+
+bool P4HIRConverter::expandOpAssignBinOp(const P4::IR::OpAssignmentStatement *opAssign,
+                                         P4HIR::BinOpKind kind) {
+    auto loc = getLoc(builder, opAssign);
+    auto lhsRef = resolveReference(opAssign->left);
+    visit(opAssign->right);
+
+    auto type = getOrCreateType(opAssign->left->type);
+    auto binop = builder.create<P4HIR::BinOp>(
+        loc, kind, getValue(opAssign->left, type), getValue(opAssign->right, type));
+    builder.create<P4HIR::AssignOp>(loc, binop, lhsRef);
+
+    return false;
+}
+
+template <typename ShiftOp>
+bool P4HIRConverter::expandOpAssignShift(const P4::IR::OpAssignmentStatement *opAssign) {
+    auto loc = getLoc(builder, opAssign);
+    auto lhsRef = resolveReference(opAssign->left);
+    visit(opAssign->right);
+
+    auto type = getOrCreateType(opAssign->left->type);
+    auto shiftop = builder.create<ShiftOp>(
+        loc, getValue(opAssign->left, type), getValue(opAssign->right, type));
+    builder.create<P4HIR::AssignOp>(loc, shiftop, lhsRef);
 
     return false;
 }
