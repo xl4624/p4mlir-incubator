@@ -294,6 +294,7 @@ def UnaryOp : P4HIR_Op<"unary",
   }];
 
   let hasVerifier = 1;
+  let hasFolder = 1;
 }
 
 def BinOpKind_Mul    : I32EnumAttrCase<"Mul",   1, "mul">;
@@ -417,6 +418,7 @@ def ShlOp : P4HIR_Op<"shl",
   ];
 
   let hasVerifier = 1;
+  let hasFolder = 1;
 
   let assemblyFormat = [{
     `(` $lhs `,` $rhs `:` type($rhs) `)` `:` type($result) attr-dict
@@ -454,6 +456,7 @@ def ShrOp : P4HIR_Op<"shr",
   ];
 
   let hasVerifier = 1;
+  let hasFolder = 1;
 
   let assemblyFormat = [{
     `(` $lhs `,` $rhs `:` type($rhs) `)` `:` type($result) attr-dict
