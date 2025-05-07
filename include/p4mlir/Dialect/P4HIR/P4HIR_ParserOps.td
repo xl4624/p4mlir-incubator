@@ -3,7 +3,7 @@
 
 def ParserOp : P4HIR_Op<"parser",
     [Symbol, SymbolTable,
-     FunctionOpInterface, AutomaticAllocationScope]> {
+     FunctionOpInterface, AutomaticAllocationScope, AnnotatedInterface]> {
   let arguments = (ins SymbolNameAttr:$sym_name,
                        TypeAttrOf<FuncType>:$applyType,
                        TypeAttrOf<CtorType>:$ctorType,
@@ -55,7 +55,7 @@ def ParserOp : P4HIR_Op<"parser",
 
 def ParserStateOp : P4HIR_Op<"state",
    [Symbol, AutomaticAllocationScope,
-    HasParent<"ParserOp">]> {
+    HasParent<"ParserOp">, AnnotatedInterface]> {
  let arguments = (ins SymbolNameAttr:$sym_name,
                       OptionalAttr<DictionaryAttr>:$annotations);
  let regions = (region MinSizedRegion<1>:$body);

@@ -14,6 +14,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "p4mlir/Dialect/P4HIR/P4HIR_Dialect.td"
 include "p4mlir/Dialect/P4HIR/P4HIR_Types.td"
 include "p4mlir/Dialect/P4HIR/P4HIR_Attrs.td"
+include "p4mlir/Dialect/P4HIR/P4HIR_Interfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Base P4HIR operation definition.
@@ -794,7 +795,7 @@ def FuncOp : P4HIR_Op<"func", [
     > attribute like SymbolRefAttr). An external function declaration (used when
     > referring to a function declared in some other module) has no body. While
     > the MLIR textual form provides a nice inline syntax for function arguments,
-    > they are internally represented as “block arguments” to the first block in
+    > they are internally represented as "block arguments" to the first block in
     > the region.
     >
     > Only dialect attribute names may be specified in the attribute dictionaries
