@@ -1542,8 +1542,10 @@ LogicalResult P4HIR::AssignSliceOp::verify() {
 
 // Parser states use fully-qualified names so we lookup from the top-level moduleOp
 static P4HIR::ParserStateOp lookupParserState(Operation *op, mlir::SymbolRefAttr stateName) {
-    return mlir::SymbolTable::lookupNearestSymbolFrom<P4HIR::ParserStateOp>(getParentModule(op),
-                                                                            stateName);
+    auto res = mlir::SymbolTable::lookupNearestSymbolFrom<P4HIR::ParserStateOp>(getParentModule(op),
+                                                                                stateName);
+    assert(res && "expected valid parser state lookup");
+    return res;
 }
 
 void P4HIR::ParserOp::build(mlir::OpBuilder &builder, mlir::OperationState &result,
@@ -1919,7 +1921,7 @@ LogicalResult P4HIR::RangeOp::verify() {
 
     // However, ranges can also be used as collections in ForInOp, which means
     // their results can only be used once and their user must be a ForInOp.
-    mlir::Value result = getOperation()->getResult(0);
+    mlir::Value result = getResult();
     if (!result.hasOneUse()) {
         return emitOpError("when not nested in p4hir.select_case, ")
                << "expected single use by p4hir.foreach but found "
@@ -2829,13 +2831,13 @@ llvm::SmallVector<Region *> P4HIR::ForInOp::getLoopRegions() { return {&getBodyR
 // ConditionOp
 //===----------------------------------------------------------------------===//
 
-MutableOperandRange P4HIR::ConditionOp::getMutableSuccessorOperands(RegionBranchPoint point) {
+mlir::MutableOperandRange P4HIR::ConditionOp::getMutableSuccessorOperands(RegionBranchPoint point) {
     auto parent = mlir::cast<P4HIR::ForOp>(getOperation()->getParentOp());
     assert((point.isParent() || point.getRegionOrNull() == &parent.getBodyRegion()) &&
            "condition op can only exit the loop or branch to the body region");
 
     // No values are yielded to the successor region
-    return MutableOperandRange(getOperation(), 0, 0);
+    return mlir::MutableOperandRange(getOperation(), 0, 0);
 }
 
 //===----------------------------------------------------------------------===//
