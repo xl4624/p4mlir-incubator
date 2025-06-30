@@ -63,16 +63,16 @@ class EnumFieldConversionPattern : public OpConversionPattern<P4HIR::ConstOp> {
 
     LogicalResult matchAndRewrite(P4HIR::ConstOp op, OpAdaptor /*adaptor*/,
                                   ConversionPatternRewriter &rewriter) const override {
-        auto oldAttr = mlir::dyn_cast<P4HIR::EnumFieldAttr>(op.getValue());
-        if (!oldAttr) return mlir::failure();
+        auto enumFieldAttr = mlir::dyn_cast<P4HIR::EnumFieldAttr>(op.getValue());
+        if (!enumFieldAttr) return mlir::failure();
 
-        auto originalType = mlir::dyn_cast<P4HIR::EnumType>(oldAttr.getType());
-        if (!originalType) return mlir::failure();
+        auto enumType = mlir::dyn_cast<P4HIR::EnumType>(enumFieldAttr.getType());
+        if (!enumType) return mlir::failure();
 
-        auto targetType = getTypeConverter()->convertType(originalType);
-        if (!targetType) return mlir::failure();
+        auto serEnumType = getTypeConverter()->convertType(enumType);
+        if (!serEnumType) return mlir::failure();
 
-        auto newAttr = P4HIR::EnumFieldAttr::get(targetType, oldAttr.getField());
+        auto newAttr = P4HIR::EnumFieldAttr::get(serEnumType, enumFieldAttr.getField());
         rewriter.replaceOpWithNewOp<P4HIR::ConstOp>(op, newAttr);
 
         return mlir::success();
