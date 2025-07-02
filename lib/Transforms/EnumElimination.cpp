@@ -73,7 +73,7 @@ class EnumFieldConversionPattern : public OpConversionPattern<P4HIR::ConstOp> {
         if (!serEnumType) return mlir::failure();
 
         auto newAttr = P4HIR::EnumFieldAttr::get(serEnumType, enumFieldAttr.getField());
-        rewriter.replaceOpWithNewOp<P4HIR::ConstOp>(op, newAttr);
+        rewriter.replaceOpWithNewOp<P4HIR::ConstOp>(op, newAttr, op.getNameAttr(), op.getAnnotationsAttr());
 
         return mlir::success();
     }
