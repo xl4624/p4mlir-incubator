@@ -120,4 +120,18 @@ def SerEnumElimination : Pass<"p4hir-ser-enum-elimination", "mlir::ModuleOp"> {
   let dependentDialects = ["P4MLIR::P4HIR::P4HIRDialect"];
 }
 
+//===----------------------------------------------------------------------===//
+// RemoveAliases
+//===----------------------------------------------------------------------===//
+
+def RemoveAliases : Pass<"p4hir-remove-alias", "mlir::ModuleOp"> {
+  let summary = "Replace newtypes with the types they were defined to represent";
+  let description = [{
+    TODO
+  }];
+
+  let constructor = "P4MLIR::createRemoveAliasesPass()";
+  let dependentDialects = ["P4MLIR::P4HIR::P4HIRDialect"];
+}
+
 #endif // P4MLIR_TRANSFORMS_PASSES_TD
